@@ -19,7 +19,6 @@
 #include "AllScriptsObjects.h"
 #include "InstanceScript.h"
 #include "LFGScripts.h"
-#include "ScriptObject.h"
 #include "ScriptSystem.h"
 #include "SmartAI.h"
 #include "SpellMgr.h"
@@ -57,6 +56,11 @@ ScriptMgr* ScriptMgr::instance()
 {
     static ScriptMgr instance;
     return &instance;
+}
+
+PlayerbotScript::PlayerbotScript(const char* name) : ScriptObject(name)
+{
+    ScriptRegistry<PlayerbotScript>::AddScript(this);
 }
 
 void ScriptMgr::Initialize()
@@ -99,6 +103,7 @@ void ScriptMgr::Initialize()
     ScriptRegistry<PlayerScript>::InitEnabledHooksIfNeeded(PLAYERHOOK_END);
     ScriptRegistry<ServerScript>::InitEnabledHooksIfNeeded(SERVERHOOK_END);
     ScriptRegistry<SpellSC>::InitEnabledHooksIfNeeded(ALLSPELLHOOK_END);
+    ScriptRegistry<TicketScript>::InitEnabledHooksIfNeeded(TICKETHOOK_END);
     ScriptRegistry<UnitScript>::InitEnabledHooksIfNeeded(UNITHOOK_END);
     ScriptRegistry<WorldObjectScript>::InitEnabledHooksIfNeeded(WORLDOBJECTHOOK_END);
     ScriptRegistry<WorldScript>::InitEnabledHooksIfNeeded(WORLDHOOK_END);
@@ -143,9 +148,11 @@ void ScriptMgr::Unload()
     SCR_CLEAR<OutdoorPvPScript>();
     SCR_CLEAR<PetScript>();
     SCR_CLEAR<PlayerScript>();
+    SCR_CLEAR<PlayerbotScript>();
     SCR_CLEAR<ServerScript>();
     SCR_CLEAR<SpellSC>();
     SCR_CLEAR<SpellScriptLoader>();
+    SCR_CLEAR<TicketScript>();
     SCR_CLEAR<TransportScript>();
     SCR_CLEAR<UnitScript>();
     SCR_CLEAR<VehicleScript>();
@@ -225,7 +232,9 @@ void ScriptMgr::CheckIfScriptsInDatabaseExist()
                 !ScriptRegistry<CommandSC>::GetScriptById(sid) &&
                 !ScriptRegistry<ArenaScript>::GetScriptById(sid) &&
                 !ScriptRegistry<GroupScript>::GetScriptById(sid) &&
-                !ScriptRegistry<DatabaseScript>::GetScriptById(sid))
+                !ScriptRegistry<DatabaseScript>::GetScriptById(sid) &&
+                !ScriptRegistry<PlayerbotScript>::GetScriptById(sid) &&
+                !ScriptRegistry<TicketScript>::GetScriptById(sid))
                 {
                     LOG_ERROR("sql.sql", "Script named '{}' is assigned in the database, but has no code!", scriptName);
                 }

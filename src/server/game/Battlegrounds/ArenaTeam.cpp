@@ -17,6 +17,7 @@
 
 #include "ArenaTeam.h"
 #include "ArenaTeamMgr.h"
+#include "ArenaSeasonMgr.h"
 #include "BattlegroundMgr.h"
 #include "CharacterCache.h"
 #include "Group.h"
@@ -658,7 +659,7 @@ uint32 ArenaTeam::GetPoints(uint32 memberRating)
 
     if (rating <= 1500)
     {
-        if (sWorld->getIntConfig(CONFIG_ARENA_SEASON_ID) < 6 && !sWorld->getIntConfig(CONFIG_LEGACY_ARENA_POINTS_CALC))
+        if (sArenaSeasonMgr->GetCurrentSeason() < 6 && !sWorld->getIntConfig(CONFIG_LEGACY_ARENA_POINTS_CALC))
             points = (float)rating * 0.22f + 14.0f;
         else
             points = 344;
@@ -1100,3 +1101,22 @@ std::unordered_map<uint8, uint8> ArenaTeam::ArenaReqPlayersForType =
     { ARENA_TYPE_3v3, 6},
     { ARENA_TYPE_5v5, 10}
 };
+
+void ArenaTeam::SetEmblem(uint32 backgroundColor, uint8 emblemStyle, uint32 emblemColor, uint8 borderStyle, uint32 borderColor)
+{
+    BackgroundColor = backgroundColor;
+    EmblemStyle = emblemStyle;
+    EmblemColor = emblemColor;
+    BorderStyle = borderStyle;
+    BorderColor = borderColor;
+}
+
+void ArenaTeam::SetRatingForAll(uint32 rating)
+{
+    Stats.Rating = rating;
+
+    for (MemberList::iterator itr = Members.begin(); itr != Members.end(); ++itr)
+    {
+        itr->PersonalRating = rating;
+    }
+}

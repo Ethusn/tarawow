@@ -30,6 +30,7 @@
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include "WorldSessionMgr.h"
 #include <boost/algorithm/string/replace.hpp>
 
 Player* ChatHandler::GetPlayer() const
@@ -37,7 +38,7 @@ Player* ChatHandler::GetPlayer() const
     return m_session ? m_session->GetPlayer() : nullptr;
 }
 
-char const* ChatHandler::GetAcoreString(uint32 entry) const
+std::string ChatHandler::GetAcoreString(uint32 entry) const
 {
     return m_session->GetAcoreString(entry);
 }
@@ -81,7 +82,7 @@ bool ChatHandler::HasLowerSecurityAccount(WorldSession* target, uint32 target_ac
         return false;
 
     // ignore only for non-players for non strong checks (when allow apply command at least to same sec level)
-    if (!AccountMgr::IsPlayerAccount(m_session->GetSecurity()) && !strong && !sWorld->getBoolConfig(CONFIG_GM_LOWER_SECURITY))
+    if (!AccountMgr::IsPlayerAccount(m_session->GetSecurity()) && !strong && sWorld->getBoolConfig(CONFIG_GM_LOWER_SECURITY))
         return false;
 
     if (target)
@@ -188,7 +189,7 @@ void ChatHandler::SendGlobalSysMessage(const char* str)
     for (std::string_view line : Acore::Tokenize(str, '\n', true))
     {
         BuildChatPacket(data, CHAT_MSG_SYSTEM, LANG_UNIVERSAL, nullptr, nullptr, line);
-        sWorld->SendGlobalMessage(&data);
+        sWorldSessionMgr->SendGlobalMessage(&data);
     }
 }
 
@@ -198,7 +199,7 @@ void ChatHandler::SendGlobalGMSysMessage(const char* str)
     for (std::string_view line : Acore::Tokenize(str, '\n', true))
     {
         BuildChatPacket(data, CHAT_MSG_SYSTEM, LANG_UNIVERSAL, nullptr, nullptr, line);
-        sWorld->SendGlobalGMMessage(&data);
+        sWorldSessionMgr->SendGlobalGMMessage(&data);
     }
 }
 
@@ -370,6 +371,78 @@ std::size_t ChatHandler::BuildChatPacket(WorldPacket& data, ChatMsg chatType, La
     return BuildChatPacket(data, chatType, language, senderGUID, receiverGUID, message, chatTag, senderName, receiverName, achievementId, gmMessage, channelName);
 }
 
+void ChatHandler::BuildChatPacket(WorldPacket& data, ChatMsg msgtype, std::string_view message, Language language /*= LANG_UNIVERSAL*/, PlayerChatTag chatTag /*= CHAT_TAG_NONE*/,
+                                  ObjectGuid const& senderGuid /*= ObjectGuid()*/, std::string_view senderName /*= nullptr*/,
+                                  ObjectGuid const& targetGuid /*= ObjectGuid()*/, std::string_view targetName /*= nullptr*/,
+                                  std::string_view channelName /*= nullptr*/, uint32 achievementId /*= 0*/)
+{
+    const bool isGM = (chatTag & CHAT_TAG_GM) != 0;
+    bool isAchievement = false;
+
+    data.Initialize((isGM && language != LANG_ADDON) ? SMSG_GM_MESSAGECHAT : SMSG_MESSAGECHAT);
+    data << uint8(msgtype);
+    data << uint32(language);
+    data << ObjectGuid(senderGuid);
+    data << uint32(0);                                              // 2.1.0
+
+    switch (msgtype)
+    {
+        case CHAT_MSG_MONSTER_SAY:
+        case CHAT_MSG_MONSTER_PARTY:
+        case CHAT_MSG_MONSTER_YELL:
+        case CHAT_MSG_MONSTER_WHISPER:
+        case CHAT_MSG_MONSTER_EMOTE:
+        case CHAT_MSG_RAID_BOSS_WHISPER:
+        case CHAT_MSG_RAID_BOSS_EMOTE:
+        case CHAT_MSG_BATTLENET:
+        case CHAT_MSG_WHISPER_FOREIGN:
+            data << uint32(senderName.size() + 1);
+            data << senderName;
+            data << ObjectGuid(targetGuid);                         // Unit Target
+            if (targetGuid && !targetGuid.IsPlayer() && !targetGuid.IsPet() && (msgtype != CHAT_MSG_WHISPER_FOREIGN))
+            {
+                data << uint32(targetName.size() + 1);              // target name length
+                data << targetName;                                 // target name
+            }
+            break;
+        case CHAT_MSG_BG_SYSTEM_NEUTRAL:
+        case CHAT_MSG_BG_SYSTEM_ALLIANCE:
+        case CHAT_MSG_BG_SYSTEM_HORDE:
+            data << ObjectGuid(targetGuid);                         // Unit Target
+            if (targetGuid && !targetGuid.IsPlayer())
+            {
+                data << uint32(targetName.size() + 1);              // target name length
+                data << targetName;                                 // target name
+            }
+            break;
+        case CHAT_MSG_ACHIEVEMENT:
+        case CHAT_MSG_GUILD_ACHIEVEMENT:
+            data << ObjectGuid(targetGuid);                         // Unit Target
+            isAchievement = true;
+            break;
+        default:
+            if (isGM)
+            {
+                data << uint32(senderName.size() + 1);
+                data << senderName;
+            }
+
+            if (msgtype == CHAT_MSG_CHANNEL)
+            {
+                data << channelName;
+            }
+            data << ObjectGuid(targetGuid);
+            break;
+    }
+    data << uint32(message.size() + 1);
+    data << message;
+    data << uint8(chatTag);
+
+    if (isAchievement)
+        data << uint32(achievementId);
+}
+
+
 Player* ChatHandler::getSelectedPlayer() const
 {
     if (!m_session)
@@ -442,8 +515,8 @@ bool ChatHandler::HasSession() const
 
 void ChatHandler::DoForAllValidSessions(std::function<void(Player*)> exec)
 {
-    SessionMap::const_iterator itr;
-    for (itr = sWorld->GetAllSessions().begin(); itr != sWorld->GetAllSessions().end(); ++itr)
+    WorldSessionMgr::SessionMap const& sessionMap = sWorldSessionMgr->GetAllSessions();
+    for (WorldSessionMgr::SessionMap::const_iterator itr = sessionMap.begin(); itr != sessionMap.end(); ++itr)
         if (Player* player = itr->second->GetPlayer())
             if (player->IsInWorld())
                 exec(player);
@@ -881,7 +954,7 @@ std::string ChatHandler::GetNameLink(Player* chr) const
     return playerLink(chr->GetName());
 }
 
-char const* CliHandler::GetAcoreString(uint32 entry) const
+std::string CliHandler::GetAcoreString(uint32 entry) const
 {
     return sObjectMgr->GetAcoreStringForDBCLocale(entry);
 }

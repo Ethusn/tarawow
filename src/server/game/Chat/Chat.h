@@ -22,7 +22,6 @@
 #include "Player.h"
 #include "SharedDefines.h"
 #include "WorldSession.h"
-#include <vector>
 
 class ChatHandler;
 class Creature;
@@ -33,6 +32,17 @@ class WorldSession;
 class WorldObject;
 
 struct GameTele;
+
+enum PlayerChatTag
+{
+    CHAT_TAG_NONE               = 0x00,
+    CHAT_TAG_AFK                = 0x01,
+    CHAT_TAG_DND                = 0x02,
+    CHAT_TAG_GM                 = 0x04,
+    CHAT_TAG_COM                = 0x08,                     // Commentator
+    CHAT_TAG_DEV                = 0x10,                     // Developer
+};
+typedef uint32 ChatTagFlags;
 
 class AC_GAME_API ChatHandler
 {
@@ -47,6 +57,13 @@ public:
 
     // Builds chat packet and returns receiver guid position in the packet to substitute in whisper builders
     static std::size_t BuildChatPacket(WorldPacket& data, ChatMsg chatType, Language language, WorldObject const* sender, WorldObject const* receiver, std::string_view message, uint32 achievementId = 0, std::string const& channelName = "", LocaleConstant locale = DEFAULT_LOCALE);
+
+    // All in one chat message builder
+    static void BuildChatPacket(
+            WorldPacket& data, ChatMsg msgtype, std::string_view message, Language language = LANG_UNIVERSAL, PlayerChatTag chatTag = CHAT_TAG_NONE,
+            ObjectGuid const& senderGuid = ObjectGuid(), std::string_view senderName = {},
+            ObjectGuid const& targetGuid = ObjectGuid(), std::string_view targetName = {},
+            std::string_view channelName = {}, uint32 achievementId = 0);
 
     static char* LineFromMessage(char*& pos) { char* start = strtok(pos, "\n"); pos = nullptr; return start; }
 
@@ -131,7 +148,7 @@ public:
     }
 
     // function with different implementation for chat/console
-    virtual char const* GetAcoreString(uint32 entry) const;
+    virtual std::string GetAcoreString(uint32 entry) const;
     virtual void SendSysMessage(std::string_view str, bool escapeCharacters = false);
 
     void SendSysMessage(uint32 entry);
@@ -259,7 +276,7 @@ public:
     explicit CliHandler(void* callbackArg, Print* zprint) : m_callbackArg(callbackArg), m_print(zprint) { }
 
     // overwrite functions
-    char const* GetAcoreString(uint32 entry) const override;
+    std::string GetAcoreString(uint32 entry) const override;
     void SendSysMessage(std::string_view, bool escapeCharacters) override;
     bool ParseCommands(std::string_view str) override;
     std::string GetNameLink() const override;

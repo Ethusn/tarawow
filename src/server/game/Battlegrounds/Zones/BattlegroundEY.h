@@ -305,11 +305,11 @@ struct BattlegroundEYLosingPointStruct
 
 struct BattlegroundEYCapturingPointStruct
 {
-    BattlegroundEYCapturingPointStruct(uint32 _DespawnNeutralObjectType, uint32 _SpawnObjectTypeAlliance, uint32 _MessageIdAlliance, uint32 _SpawnObjectTypeHorde, uint32 _MessageIdHorde, uint32 _GraveYardId)
+    BattlegroundEYCapturingPointStruct(uint32 _DespawnNeutralObjectType, uint32 _SpawnObjectTypeAlliance, uint32 _MessageIdAlliance, uint32 _SpawnObjectTypeHorde, uint32 _MessageIdHorde, uint32 _GraveyardId)
         : DespawnNeutralObjectType(_DespawnNeutralObjectType),
           SpawnObjectTypeAlliance(_SpawnObjectTypeAlliance), MessageIdAlliance(_MessageIdAlliance),
           SpawnObjectTypeHorde(_SpawnObjectTypeHorde), MessageIdHorde(_MessageIdHorde),
-          GraveYardId(_GraveYardId)
+          GraveyardId(_GraveyardId)
     {}
 
     uint32 DespawnNeutralObjectType;
@@ -317,7 +317,7 @@ struct BattlegroundEYCapturingPointStruct
     uint32 MessageIdAlliance;
     uint32 SpawnObjectTypeHorde;
     uint32 MessageIdHorde;
-    uint32 GraveYardId;
+    uint32 GraveyardId;
 };
 
 const uint32 BG_EY_TickPoints[EY_POINTS_MAX] = {1, 2, 5, 10};
@@ -375,6 +375,25 @@ protected:
     uint32 FlagCaptures = 0;
 };
 
+struct CaptureEYPointInfo
+{
+    CaptureEYPointInfo() : _ownerTeamId(TEAM_NEUTRAL), _barStatus(BG_EY_PROGRESS_BAR_STATE_MIDDLE), _areaTrigger(0)
+    {
+        _playersCount[TEAM_ALLIANCE] = 0;
+        _playersCount[TEAM_HORDE] = 0;
+    }
+
+    Player* player = nullptr;
+    TeamId _ownerTeamId;
+    int8 _barStatus;
+    uint32 _areaTrigger;
+    int8 _playersCount[PVP_TEAMS_COUNT];
+
+    bool IsUnderControl(TeamId teamId) const { return _ownerTeamId == teamId; }
+    bool IsUnderControl() const { return _ownerTeamId != TEAM_NEUTRAL; }
+    bool IsUncontrolled() const { return _ownerTeamId == TEAM_NEUTRAL; }
+};
+
 class AC_GAME_API BattlegroundEY : public Battleground
 {
 public:
@@ -402,7 +421,7 @@ public:
     void Init() override;
     void EndBattleground(TeamId winnerTeamId) override;
     bool UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor = true) override;
-    void FillInitialWorldStates(WorldPacket& data) override;
+    void FillInitialWorldStates(WorldPackets::WorldState::InitWorldStates& packet) override;
     void SetDroppedFlagGUID(ObjectGuid guid, TeamId /*teamId*/ = TEAM_NEUTRAL) override  { _droppedFlagGUID = guid; }
     ObjectGuid GetDroppedFlagGUID() const { return _droppedFlagGUID; }
 
@@ -413,6 +432,8 @@ public:
     /* achievement req. */
     bool AllNodesConrolledByTeam(TeamId teamId) const override;
     TeamId GetPrematureWinner() override;
+
+    [[nodiscard]] CaptureEYPointInfo const& GetCapturePointInfo(uint32 node) const { return _capturePointInfo[node]; }
 
 private:
     void PostUpdateImpl(uint32 diff) override;
@@ -429,26 +450,7 @@ private:
     /* Scorekeeping */
     void AddPoints(TeamId teamId, uint32 points);
 
-    struct CapturePointInfo
-    {
-        CapturePointInfo() : _ownerTeamId(TEAM_NEUTRAL), _barStatus(BG_EY_PROGRESS_BAR_STATE_MIDDLE), _areaTrigger(0)
-        {
-            _playersCount[TEAM_ALLIANCE] = 0;
-            _playersCount[TEAM_HORDE] = 0;
-        }
-
-        TeamId _ownerTeamId;
-        int8 _barStatus;
-        uint32 _areaTrigger;
-        int8 _playersCount[PVP_TEAMS_COUNT];
-        Player* player = nullptr;
-
-        bool IsUnderControl(TeamId teamId) const { return _ownerTeamId == teamId; }
-        bool IsUnderControl() const { return _ownerTeamId != TEAM_NEUTRAL; }
-        bool IsUncontrolled() const { return _ownerTeamId == TEAM_NEUTRAL; }
-    };
-
-    CapturePointInfo _capturePointInfo[EY_POINTS_MAX];
+    CaptureEYPointInfo _capturePointInfo[EY_POINTS_MAX];
     EventMap _bgEvents;
     uint32 _honorTics;
     uint8 _ownedPointsCount[PVP_TEAMS_COUNT];

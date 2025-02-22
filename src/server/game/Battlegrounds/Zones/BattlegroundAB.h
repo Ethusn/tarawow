@@ -287,6 +287,18 @@ protected:
     uint32 BasesDefended = 0;
 };
 
+struct CaptureABPointInfo
+{
+    CaptureABPointInfo() : _ownerTeamId(TEAM_NEUTRAL), _iconNone(0), _iconCapture(0), _state(BG_AB_NODE_STATE_NEUTRAL), _captured(false) {}
+
+    TeamId _ownerTeamId;
+    uint32 _iconNone;
+    uint32 _iconCapture;
+    uint8  _state;
+
+    bool _captured;
+};
+
 class AC_GAME_API BattlegroundAB : public Battleground
 {
 public:
@@ -304,13 +316,16 @@ public:
     GraveyardStruct const* GetClosestGraveyard(Player* player) override;
 
     bool UpdatePlayerScore(Player* player, uint32 type, uint32 value, bool doAddHonor = true) override;
-    void FillInitialWorldStates(WorldPacket& data) override;
+    void FillInitialWorldStates(WorldPackets::WorldState::InitWorldStates& packet) override;
     void EventPlayerClickedOnFlag(Player* source, GameObject* gameObject) override;
 
     bool AllNodesConrolledByTeam(TeamId teamId) const override;
     bool IsTeamScores500Disadvantage(TeamId teamId) const { return _teamScores500Disadvantage[teamId]; }
 
     TeamId GetPrematureWinner() override;
+
+    [[nodiscard]] CaptureABPointInfo const& GetCapturePointInfo(uint32 node) const { return _capturePointInfo[node]; }
+
 private:
     void PostUpdateImpl(uint32 diff) override;
 
@@ -321,21 +336,7 @@ private:
     void NodeDeoccupied(uint8 node);
     void ApplyPhaseMask();
 
-    struct CapturePointInfo
-    {
-        CapturePointInfo() : _ownerTeamId(TEAM_NEUTRAL), _iconNone(0), _iconCapture(0), _state(BG_AB_NODE_STATE_NEUTRAL), _captured(false)
-        {
-        }
-
-        TeamId _ownerTeamId;
-        uint32 _iconNone;
-        uint32 _iconCapture;
-        uint8 _state;
-
-        bool _captured;
-    };
-
-    CapturePointInfo _capturePointInfo[BG_AB_DYNAMIC_NODES_COUNT];
+    CaptureABPointInfo _capturePointInfo[BG_AB_DYNAMIC_NODES_COUNT];
     EventMap _bgEvents;
     uint32 _honorTics;
     uint32 _reputationTics;
